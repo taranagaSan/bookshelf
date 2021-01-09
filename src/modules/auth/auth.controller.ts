@@ -1,10 +1,20 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpException,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { CreateUserDto } from '../users/dto/user.create.dto';
-import { LoginUserDto } from '../users/dto/user-login.dto';
 import { UsersService } from '../users/users.service';
-// import { JwtAuthGuard } from './jwt.auth.guard';
 import { AuthGuard } from '@nestjs/passport';
+import { CreateOrLoginUserDto } from '../users/dto/user.create.dto';
+import { ResponseService } from '../response.service';
+import { LoginStatus } from './interfaces';
+import { UserEntity } from '../users/entity/user.entity';
+import { UserDto } from '../users/dto/user.dto';
+import { toUserDto } from '../../shared/mapper';
 
 @Controller('auth')
 export class AuthController {
@@ -14,20 +24,41 @@ export class AuthController {
   ) {}
 
   @Post('register')
-  async register(@Body() createUserDto: CreateUserDto): Promise<any> {
-    const result: any = await this._authService.register(createUserDto);
+  async register(
+    @Body() createUserDto: CreateOrLoginUserDto,
+  ): Promise<ResponseService<UserDto>> {
+    const newUser = new CreateOrLoginUserDto();
+    newUser.username = createUserDto.username;
+    newUser.email = createUserDto.email;
+    newUser.password = createUserDto.password;
+    const result: ResponseService<UserEntity> = await this._authService.register(
+      newUser,
+    );
 
-    return result;
+    if (!result.isSuccess) {
+      throw new HttpException(result.message, HttpStatus.NOT_FOUND);
+    }
+
+    return {
+      ...result,
+      data: toUserDto(result.data),
+    };
   }
 
   @Post('login')
-  async login(@Body() loginUserDto: LoginUserDto): Promise<any> {
-    return this._authService.login(loginUserDto);
+  async login(
+    @Body() createOrLoginUserDto: CreateOrLoginUserDto,
+  ): Promise<ResponseService<LoginStatus>> {
+    try {
+      return this._authService.login(createOrLoginUserDto);
+    } catch (err) {
+      throw new HttpException(err.getResponse(), err.getStatus());
+    }
   }
 
   @UseGuards(AuthGuard('jwt'))
   @Post('refresh')
-  async refresh(@Body() loginUserDto: LoginUserDto): Promise<any> {
+  async refresh(@Body() loginUserDto: CreateOrLoginUserDto): Promise<any> {
     const user = await this._usersService.findByPayload(loginUserDto);
 
     if (user) {

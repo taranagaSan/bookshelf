@@ -9,7 +9,7 @@ import * as bcrypt from 'bcrypt';
 
 @Entity('users')
 export class UserEntity {
-  @PrimaryGeneratedColumn('uuid') id: string;
+  @PrimaryGeneratedColumn('increment') id: number;
   @Column({ type: 'varchar', nullable: false }) username: string;
   @Column({ type: 'varchar', nullable: false }) password: string;
   @Column({ type: 'varchar', nullable: false, unique: true }) email: string;

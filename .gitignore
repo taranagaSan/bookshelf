@@ -36,3 +36,4 @@ lerna-debug.log*
 # configs and env
 ormconfig.json
 /.env
+/uploads/

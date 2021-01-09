@@ -1,10 +1,11 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
-import { LoginUserDto } from '../users/dto/user-login.dto';
-import { CreateUserDto } from '../users/dto/user.create.dto';
 import { UserDto } from '../users/dto/user.dto';
-import { JwtPayload } from './interfaces';
+import { JwtPayload, LoginStatus } from './interfaces';
+import { ResponseService } from '../response.service';
+import { CreateOrLoginUserDto } from '../users/dto/user.create.dto';
+import { UserEntity } from '../users/entity/user.entity';
 
 @Injectable()
 export class AuthService {
@@ -13,28 +14,36 @@ export class AuthService {
     private readonly _jwtService: JwtService,
   ) {}
 
-  async register(userDto: CreateUserDto): Promise<any> {
+  async register(
+    userDto: CreateOrLoginUserDto,
+  ): Promise<ResponseService<UserEntity>> {
     try {
-      await this._usersService.create(userDto);
-      return true;
+      return await this._usersService.create(userDto);
     } catch (err) {
-      new HttpException(err.message, HttpStatus.BAD_REQUEST);
-      return {
-        message: err.message,
-        status: HttpStatus.BAD_REQUEST,
-      };
+      return new ResponseService<UserEntity>(
+        false,
+        'User already exists',
+        null,
+      );
     }
   }
 
-  async login(loginUserDto: LoginUserDto): Promise<any> {
-    const user = await this._usersService.findByEmail(loginUserDto);
-    const token = this._createToken(user);
+  async login(
+    loginUserDto: CreateOrLoginUserDto,
+  ): Promise<ResponseService<LoginStatus>> {
+    try {
+      const user = await this._usersService.findByEmail(loginUserDto);
+      const token = this._createToken(user);
+      const data: LoginStatus = {
+        username: user.username,
+        id: user.id,
+        ...token,
+      };
 
-    return {
-      username: user.username,
-      id: user.id,
-      ...token,
-    };
+      return new ResponseService<LoginStatus>(true, 'User was loggedInn', data);
+    } catch (err) {
+      throw new HttpException(err.getResponse(), err.getStatus());
+    }
   }
 
   private _createToken({ email }: UserDto): any {
